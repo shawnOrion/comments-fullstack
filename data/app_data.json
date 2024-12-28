@@ -1,0 +1,16 @@
+{
+  "currentUser": {
+    "id": 1,
+    "name": "juliusomo",
+    "image": "https://play.rosebud.ai/assets/image-juliusomo.webp?SuPD"
+  },
+  "comments": [
+    {
+      "id": 1,
+      "content": "Great work!",
+      "createdAt": "2023-12-01T12:00:00Z",
+      "userId": 2,
+      "parentId": null
+    }
+  ]
+}

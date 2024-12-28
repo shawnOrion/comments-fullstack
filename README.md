@@ -45,6 +45,7 @@
 
 5. **Push to GitHub**:
    ```bash
+   git branch -M main
    git push -u origin main
    ```
 

@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const db = require('./db/queries'); // Import the queries module
+
 const app = express();
 const PORT = 3000;
 
@@ -8,44 +10,10 @@ app.use(express.json());
 
 // Enable CORS for specific origin (adjust as needed)
 app.use(cors({
-    origin: 'https://canvas.play.rosebud.ai', // Allow this origin
+    origin: 'https://canvas.play.rosebud.ai',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-// Current User Data
-const currentUser = {
-    id: 1001,
-    name: "juliusomo",
-    image: "https://play.rosebud.ai/assets/image-juliusomo.webp?SuPD"
-};
-
-
-// Initial Comments Data
-let comments = [
-    {
-        id: 1,
-        content: "Impressive! Though it seems the drag feature could be improved. But overall it looks incredible. You've nailed the design and the responsiveness at various breakpoints works really well.",
-        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
-        user: {
-            id: 1002,
-            name: "amyrobson",
-            image: "https://play.rosebud.ai/assets/image-amyrobson.webp?VXRV"
-        }
-    },
-    {
-        id: 2,
-        content: "Woah, your project looks awesome! How long have you been coding for? I'm still new, but think I want to dive into React as well soon. Perhaps you can give me an insight on where I should start? Thanks!",
-        createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days ago
-        user: {
-            id: 1003,
-            name: "maxblagun",
-            image: "https://play.rosebud.ai/assets/image-maxblagun.webp?HLis"
-        }
-    }
-];
-
-let commentId = comments.length + 1; // Auto-incrementing ID based on existing comments
 
 // Helper to log input and output data
 const logRequestResponse = (req, resData) => {
@@ -55,113 +23,112 @@ const logRequestResponse = (req, resData) => {
     console.log('Response Data:', resData);
 };
 
-// Endpoint to Get Current User
-app.get('/api/current-user', (req, res) => {
+// User-related routes
+// Endpoint to Get All Users
+app.get('/api/users', async (req, res) => {
     try {
-        const resData = currentUser;
-        logRequestResponse(req, resData);
-        res.status(200).send(resData);
+        const users = await db.getAllUsers(); // Fetch users from the database
+        logRequestResponse(req, users);
+        res.status(200).json(users);
     } catch (error) {
-        console.error('Error retrieving current user:', error.message);
-        res.status(500).send({ error: 'Failed to retrieve current user.' });
+        console.error('Error fetching users:', error.message);
+        res.status(500).json({ error: 'Failed to fetch users.' });
     }
 });
 
-// Endpoint to Get All Comments
-app.get('/api/comments', (req, res) => {
+// Endpoint to Create a New User
+app.post('/api/users', async (req, res) => {
+    const { name, image } = req.body;
+
+    if (!name || !image) {
+        return res.status(400).json({ error: 'Name and image are required.' });
+    }
+
     try {
-        const resData = comments;
-        logRequestResponse(req, resData);
-        res.status(200).send(resData);
+        const newUser = await db.createUser(name, image); // Insert user into the database
+        logRequestResponse(req, newUser);
+        res.status(201).json(newUser);
     } catch (error) {
-        console.error('Error retrieving comments:', error.message);
-        res.status(500).send({ error: 'Failed to retrieve comments.' });
+        console.error('Error creating user:', error.message);
+        res.status(500).json({ error: 'Failed to create user.' });
+    }
+});
+
+// Comment-related routes
+// Endpoint to Get All Comments
+app.get('/api/comments', async (req, res) => {
+    try {
+        const comments = await db.getAllComments(); // Fetch comments from the database
+        logRequestResponse(req, comments);
+        res.status(200).json(comments);
+    } catch (error) {
+        console.error('Error fetching comments:', error.message);
+        res.status(500).json({ error: 'Failed to fetch comments.' });
+    }
+});
+
+// Endpoint to Get a Comment by ID
+app.get('/api/comments/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const comment = await db.getCommentById(id); // Fetch comment by ID
+        logRequestResponse(req, comment);
+        res.status(200).json(comment);
+    } catch (error) {
+        console.error('Error fetching comment:', error.message);
+        res.status(404).json({ error: 'Comment not found.' });
     }
 });
 
 // Endpoint to Create a New Comment
-app.post('/api/comments', (req, res) => {
+app.post('/api/comments', async (req, res) => {
+    const { content, userId, parentId } = req.body;
+
+    if (!content || !userId) {
+        return res.status(400).json({ error: 'Content and userId are required.' });
+    }
+
     try {
-        const { content, createdAt } = req.body;
-
-        if (!content || !createdAt) {
-            const error = 'Both content and createdAt are required.';
-            console.error(error);
-            return res.status(400).send({ error });
-        }
-
-        // Create new comment
-        const newComment = {
-            id: commentId++, // Auto-increment ID
-            content,
-            createdAt: new Date(createdAt).toLocaleString(),
-            user: currentUser // Attach the current user as the comment's author
-        };
-
-        // Add to comments list
-        comments.push(newComment);
-
+        const newComment = await db.createComment(content, userId, parentId); // Insert comment into the database
         logRequestResponse(req, newComment);
-        res.status(201).send(newComment);
+        res.status(201).json(newComment);
     } catch (error) {
         console.error('Error creating comment:', error.message);
-        res.status(500).send({ error: 'Failed to create comment.' });
+        res.status(500).json({ error: 'Failed to create comment.' });
     }
 });
 
 // Endpoint to Update a Comment
-app.put('/api/comments/:id', (req, res) => {
+app.put('/api/comments/:id', async (req, res) => {
+    const { id } = req.params;
+    const { content } = req.body;
+
+    if (!content) {
+        return res.status(400).json({ error: 'Content is required.' });
+    }
+
     try {
-        const { id } = req.params;
-        const { content, createdAt } = req.body;
-
-        const comment = comments.find(comment => comment.id === parseInt(id));
-
-        if (!comment) {
-            const error = 'Comment not found.';
-            console.error(error);
-            return res.status(404).send({ error });
-        }
-
-        if (!content || !createdAt) {
-            const error = 'Both content and createdAt are required.';
-            console.error(error);
-            return res.status(400).send({ error });
-        }
-
-        // Update comment details
-        comment.content = content;
-        comment.createdAt = new Date(createdAt).toLocaleString();
-
-        logRequestResponse(req, comment);
-        res.status(200).send(comment);
+        const updatedComment = await db.updateComment(id, content); // Update comment by ID
+        logRequestResponse(req, updatedComment);
+        res.status(200).json(updatedComment);
     } catch (error) {
         console.error('Error updating comment:', error.message);
-        res.status(500).send({ error: 'Failed to update comment.' });
+        res.status(404).json({ error: 'Comment not found.' });
     }
 });
 
 // Endpoint to Delete a Comment
-app.delete('/api/comments/:id', (req, res) => {
+app.delete('/api/comments/:id', async (req, res) => {
+    const { id } = req.params;
+
     try {
-        const { id } = req.params;
-
-        const commentIndex = comments.findIndex(comment => comment.id === parseInt(id));
-
-        if (commentIndex === -1) {
-            const error = 'Comment not found.';
-            console.error(error);
-            return res.status(404).send({ error });
-        }
-
-        // Remove comment
-        const deletedComment = comments.splice(commentIndex, 1);
-
+        const deletedComment = await db.deleteComment(id); // Delete comment by ID
         logRequestResponse(req, deletedComment);
-        res.status(204).send(); // No content response
+        res.status(200).json(deletedComment);
     } catch (error) {
         console.error('Error deleting comment:', error.message);
-        res.status(500).send({ error: 'Failed to delete comment.' });
+        res.status(404).json({ error: 'Comment not found.' });
     }
 });
 
